@@ -1,8 +1,14 @@
 import nodemailer from 'nodemailer';
+import { randomBytes } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { CONTACT_PHONE_REGIONS, isValidContactPhone } from '../data/phoneRegions';
 
 export interface ContactInquiry {
   fullName: string;
   email: string;
+  phone?: string;
+  phoneRegion?: string;
   company?: string;
   service: string;
   budget?: string;
@@ -19,6 +25,14 @@ export function isContactInquiry(value: unknown): value is ContactInquiry {
     typeof inquiry.email === 'string' &&
     inquiry.email.length <= 254 &&
     /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(inquiry.email.trim()) &&
+    (inquiry.phone === undefined ||
+      (typeof inquiry.phone === 'string' && inquiry.phone.length <= 40)) &&
+    (inquiry.phoneRegion === undefined ||
+      (typeof inquiry.phoneRegion === 'string' &&
+        CONTACT_PHONE_REGIONS.some(({ code }) => code === inquiry.phoneRegion))) &&
+    (!inquiry.phone?.trim() ||
+      !inquiry.phoneRegion ||
+      isValidContactPhone(inquiry.phone, inquiry.phoneRegion)) &&
     typeof inquiry.service === 'string' &&
     inquiry.service.trim().length > 0 &&
     inquiry.service.length <= 120 &&
@@ -30,6 +44,41 @@ export function isContactInquiry(value: unknown): value is ContactInquiry {
     inquiry.description.trim().length >= 15 &&
     inquiry.description.length <= 5000
   );
+}
+
+export function isMissingEmailConfiguration(error: unknown): boolean {
+  return error instanceof Error && error.message.startsWith('Contact email is not configured.');
+}
+
+export async function recordContactInquiry(
+  inquiry: ContactInquiry,
+  emailDispatched: boolean,
+): Promise<void> {
+  const inquiriesFile = process.env.INQUIRIES_FILE
+    ? path.resolve(process.env.INQUIRIES_FILE)
+    : path.resolve(process.cwd(), 'data', 'inquiries.json');
+
+  await mkdir(path.dirname(inquiriesFile), { recursive: true });
+
+  let inquiries: unknown[] = [];
+  try {
+    const existing = await readFile(inquiriesFile, 'utf8');
+    const parsed: unknown = JSON.parse(existing);
+    if (Array.isArray(parsed)) inquiries = parsed;
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') {
+      console.warn('Could not read existing inquiry records:', error);
+    }
+  }
+
+  const id = `WZ-${randomBytes(3).toString('hex').toUpperCase()}`;
+  inquiries.push({
+    id,
+    ...inquiry,
+    createdAt: new Date().toISOString(),
+    emailDispatched,
+  });
+  await writeFile(inquiriesFile, `${JSON.stringify(inquiries, null, 2)}\n`, 'utf8');
 }
 
 export async function sendContactInquiry(inquiry: ContactInquiry): Promise<void> {
@@ -55,6 +104,11 @@ export async function sendContactInquiry(inquiry: ContactInquiry): Promise<void>
     text: [
       `Name: ${inquiry.fullName.trim()}`,
       `Email: ${inquiry.email.trim()}`,
+      `Phone: ${
+        inquiry.phone?.trim()
+          ? `${inquiry.phoneRegion || ''} ${inquiry.phone.trim()}`.trim()
+          : 'Not provided'
+      }`,
       `Company: ${inquiry.company?.trim() || 'Not provided'}`,
       `Service: ${inquiry.service.trim()}`,
       `Budget: ${inquiry.budget?.trim() || 'Not specified'}`,

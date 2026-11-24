@@ -1,5 +1,10 @@
 import type { Handler, HandlerResponse } from '@netlify/functions';
-import { isContactInquiry, sendContactInquiry } from '../../src/server/contactEmail';
+import {
+  isContactInquiry,
+  isMissingEmailConfiguration,
+  recordContactInquiry,
+  sendContactInquiry,
+} from '../../src/server/contactEmail';
 
 export const handler: Handler = async (event): Promise<HandlerResponse> => {
   if (event.httpMethod !== 'POST') {
@@ -34,17 +39,27 @@ export const handler: Handler = async (event): Promise<HandlerResponse> => {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'Your inquiry has been sent.' }),
+      body: JSON.stringify({ message: "We'll review your project details and contact you soon." }),
     };
   } catch (error) {
     console.error('Failed to send contact inquiry:', error);
-    const notConfigured =
-      error instanceof Error && error.message.startsWith('Contact email is not configured.');
+    if (isMissingEmailConfiguration(error)) {
+      try {
+        await recordContactInquiry(inquiry, false);
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: "We'll review your project details and contact you soon." }),
+        };
+      } catch (recordError) {
+        console.error('Failed to record contact inquiry:', recordError);
+      }
+    }
     return {
-      statusCode: notConfigured ? 503 : 500,
+      statusCode: isMissingEmailConfiguration(error) ? 503 : 500,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        error: notConfigured
+        error: isMissingEmailConfiguration(error)
           ? 'The contact form is temporarily unavailable. Please email us directly.'
           : 'We could not send your inquiry. Please try again later.',
       }),

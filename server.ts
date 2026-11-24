@@ -1,7 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
-import { isContactInquiry, sendContactInquiry } from './src/server/contactEmail';
+import {
+  isContactInquiry,
+  isMissingEmailConfiguration,
+  recordContactInquiry,
+  sendContactInquiry,
+} from './src/server/contactEmail';
 import { createServer as createViteServer } from 'vite';
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -38,18 +43,24 @@ async function startServer() {
 
     try {
       await sendContactInquiry(req.body);
-      res.status(200).json({ message: 'Your inquiry has been sent.' });
+      res.status(200).json({ message: "We'll review your project details and contact you soon." });
     } catch (error) {
       console.error('Failed to send contact inquiry:', error);
-      const notConfigured =
-        error instanceof Error && error.message.startsWith('Contact email is not configured.');
-      res
-        .status(notConfigured ? 503 : 500)
-        .json({
-          error: notConfigured
-            ? 'The contact form is temporarily unavailable. Please email us directly.'
-            : 'We could not send your inquiry. Please try again later.',
-        });
+      if (isMissingEmailConfiguration(error)) {
+        try {
+          await recordContactInquiry(req.body, false);
+          res.status(200).json({ message: "We'll review your project details and contact you soon." });
+        } catch (recordError) {
+          console.error('Failed to record contact inquiry:', recordError);
+          res.status(503).json({
+            error: 'The contact form is temporarily unavailable. Please email us directly.',
+          });
+        }
+        return;
+      }
+      res.status(500).json({
+        error: 'We could not send your inquiry. Please try again later.',
+      });
     }
   });
 

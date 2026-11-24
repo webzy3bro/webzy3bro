@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowRight, CheckCircle2, RotateCcw } from 'lucide-react';
-import { CONTACT_BUDGET_OPTIONS, CONTACT_SERVICE_OPTIONS } from '../data/agencyData';
+import { CONTACT_SERVICE_OPTIONS } from '../data/agencyData';
+import { CONTACT_PHONE_REGIONS, getContactPhoneLengthHint, isValidContactPhone } from '../data/phoneRegions';
 import { MagneticButton } from './MagneticButton';
 
 interface ContactSectionProps {
@@ -10,6 +11,8 @@ interface ContactSectionProps {
 interface FormState {
   fullName: string;
   email: string;
+  phone: string;
+  phoneRegion: string;
   company: string;
   service: string;
   budget: string;
@@ -21,6 +24,8 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
   const [form, setForm] = useState<FormState>({
     fullName: '',
     email: '',
+    phone: '',
+    phoneRegion: '+91',
     company: '',
     service: preselectedService || 'Website',
     budget: '',
@@ -30,6 +35,7 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
   const [submitError, setSubmitError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     if (preselectedService) {
@@ -48,6 +54,9 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
     if (!form.service) {
       errors.service = 'Please select a service.';
     }
+    if (form.phone.trim() && !isValidContactPhone(form.phone, form.phoneRegion)) {
+      errors.phone = `Please enter a valid phone number. ${getContactPhoneLengthHint(form.phoneRegion)}`;
+    }
     if (form.description.trim().length < 15) {
       errors.description = 'Please include at least 15 characters describing your project.';
     }
@@ -62,10 +71,15 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
     setStatus('submitting');
     setSubmitError('');
     try {
+      const { phone, phoneRegion, ...inquiry } = form;
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...inquiry,
+          phone: phone.trim(),
+          phoneRegion,
+        }),
       });
 
       const responseText = await response.text();
@@ -93,6 +107,7 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
       if (!result.message) {
         throw new Error('The server did not confirm delivery. Please try again or email us directly.');
       }
+      setSuccessMessage(result.message);
       setStatus('success');
     } catch (error) {
       setStatus('idle');
@@ -104,6 +119,8 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
     setForm({
       fullName: '',
       email: '',
+      phone: '',
+      phoneRegion: '+91',
       company: '',
       service: 'Website',
       budget: '',
@@ -112,6 +129,7 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
     setFieldErrors({});
     setStatus('idle');
     setSubmitError('');
+    setSuccessMessage('');
   };
 
   return (
@@ -155,10 +173,10 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
               <div className="flex items-center justify-between text-zinc-400">
                 <span>Direct Email</span>
                 <a
-                  href="mailto:hello@webzy3bro.com"
+                  href="mailto:webzy3bro@gmail.com"
                   className="text-white hover:text-[#C084FC] transition-colors font-medium"
                 >
-                  hello@webzy3bro.com
+                  webzy3bro@gmail.com
                 </a>
               </div>
               <div className="flex items-center justify-between text-zinc-400">
@@ -178,10 +196,10 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
                   </div>
                   <div className="space-y-2 max-w-md mx-auto">
                     <h3 className="font-display text-2xl sm:text-3xl font-bold text-white">
-                      Your inquiry has been sent.
+                      Thank you for reaching out!
                     </h3>
                     <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-                      Thanks for reaching out. We&apos;ll review your project details and get back to you soon.
+                      {successMessage || "We'll review your project details and contact you soon."}
                     </p>
                   </div>
                   <div className="pt-3">
@@ -249,6 +267,43 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <div className="space-y-2">
+                      <label htmlFor="phone" className="block text-sm font-medium text-zinc-200">
+                        Phone number <span className="text-zinc-500 text-xs">(optional)</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <select
+                          aria-label="Phone country or region calling code"
+                          value={form.phoneRegion}
+                          onChange={(e) => {
+                            setForm((p) => ({ ...p, phoneRegion: e.target.value }));
+                            if (fieldErrors.phone) setFieldErrors((fe) => ({ ...fe, phone: undefined }));
+                          }}
+                          className="w-[43%] min-w-0 rounded-xl bg-[#07070B] border border-white/12 px-2 sm:px-3 py-3 text-sm text-white focus:outline-none focus:border-[#8B5CF6] transition-colors"
+                        >
+                          {CONTACT_PHONE_REGIONS.map((region) => (
+                            <option key={region.code} value={region.code} className="bg-[#0D0D14] text-white">
+                              {region.label} ({region.code})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          id="phone"
+                          type="tel"
+                          autoComplete="tel-national"
+                          maxLength={30}
+                          placeholder="Phone number"
+                          value={form.phone}
+                          onChange={(e) => {
+                            setForm((p) => ({ ...p, phone: e.target.value }));
+                            if (fieldErrors.phone) setFieldErrors((fe) => ({ ...fe, phone: undefined }));
+                          }}
+                          className="min-w-0 flex-1 rounded-xl bg-[#07070B] border border-white/12 px-3 sm:px-4 py-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#8B5CF6] transition-colors"
+                        />
+                      </div>
+                      <p className="text-xs text-zinc-500">{getContactPhoneLengthHint(form.phoneRegion)}</p>
+                      {fieldErrors.phone && <p className="text-xs text-red-400">{fieldErrors.phone}</p>}
+                    </div>
+                    <div className="space-y-2">
                       <label htmlFor="company" className="block text-sm font-medium text-zinc-200">
                         Company or brand name <span className="text-zinc-500 text-xs">(optional)</span>
                       </label>
@@ -286,21 +341,15 @@ export function ContactSection({ preselectedService }: ContactSectionProps) {
                     <label htmlFor="budget" className="block text-sm font-medium text-zinc-200">
                       Project budget <span className="text-zinc-500 text-xs">(optional)</span>
                     </label>
-                    <select
+                    <input
                       id="budget"
+                      type="text"
+                      maxLength={120}
+                      placeholder="Enter your estimated project budget"
                       value={form.budget}
                       onChange={(e) => setForm((p) => ({ ...p, budget: e.target.value }))}
                       className="w-full rounded-xl bg-[#07070B] border border-white/12 px-4 py-3 text-sm text-white focus:outline-none focus:border-[#8B5CF6] transition-colors"
-                    >
-                      <option value="" className="bg-[#0D0D14] text-zinc-400">
-                        Select an estimated range
-                      </option>
-                      {CONTACT_BUDGET_OPTIONS.map((opt) => (
-                        <option key={opt} value={opt} className="bg-[#0D0D14] text-white">
-                          {opt}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
 
                   <div className="space-y-2">
