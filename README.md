@@ -14,7 +14,7 @@ Premium digital agency website built with React, TypeScript, Vite, Express, GSAP
 
 ## Contact Form Email Setup
 
-The contact form sends inquiries through server-side endpoints. Vercel serves it from `api/contact.ts`; Netlify routes `/api/contact` to its function; Cloudflare Pages uses `functions/api/contact.js`. Never put email credentials in frontend code or commit them.
+The contact form sends inquiries through server-side endpoints. Vercel serves it from `api/contact.ts`; Netlify routes `/api/contact` to its function; the Cloudflare Worker routes it through `worker.js` to `functions/api/contact.js`. Never put email credentials in frontend code or commit them.
 
 Set these environment variables in the server/deployment environment:
 
@@ -24,16 +24,16 @@ Set these environment variables in the server/deployment environment:
 
 For local development, copy `.env.example` to `.env` and replace the example values. Keep `.env` out of version control. In Vercel, add the variables under **Project → Settings → Environment Variables** for the environments you use, then redeploy. In Netlify, add them in **Site configuration → Environment variables**, then redeploy.
 
-### Cloudflare Pages deployment
+### Cloudflare Workers deployment
 
-The Pages Function is at `functions/api/contact.js`, so it must be deployed together with the site. Cloudflare Pages **Direct Upload from the dashboard does not support Functions**; uploading only `dist` will make `POST /api/contact` return `405`.
+The provided deployment URL is `workers.dev`, so deploy this as a Cloudflare Worker with Static Assets, not as a Pages site. A dashboard Direct Upload of only the static `dist` directory does not include the `/api/contact` handler, which causes the contact submission to return `405`.
 
-Use either of these supported deployment methods:
+From the repository root, authenticate with Wrangler and deploy the Worker and assets together. The Wrangler worker name is `1`, matching the current `1.webzy3bro.workers.dev` URL:
 
-- Connect this Git repository to Pages with the repository root as the root directory, `npm run build` as the build command, and `dist` as the build output directory. Ensure `functions/api/contact.js` is committed to the connected branch.
-- From this repository root, run `npm run deploy:pages`. Authenticate with Wrangler first using `npx wrangler login`. This builds the site and deploys `dist` together with the root `functions/` directory to the `webzy3bro` Pages project.
+- Run `npx wrangler login` once.
+- Run `npm run deploy:worker` to build and deploy `dist` with the Worker API handler.
 
-For local Pages runtime testing, run `npm run build` and then `npm run pages:dev`. Set the Cloudflare function variables in **Workers & Pages → webzy3bro → Settings → Variables and Secrets** for production and preview:
+For local Worker testing, run `npm run dev:worker`. Set the Worker variables in **Workers & Pages → 1 → Settings → Variables and Secrets**:
 
 - `GMAIL_USER`: the Gmail account used to send inquiries
 - `GMAIL_CLIENT_ID`: OAuth client ID for a Google OAuth client
@@ -41,6 +41,6 @@ For local Pages runtime testing, run `npm run build` and then `npm run pages:dev
 - `GMAIL_REFRESH_TOKEN` (secret): refresh token authorized for the Gmail API `gmail.send` scope
 - `CONTACT_EMAIL` (optional): inquiry recipient; defaults to `webzy3bro@gmail.com`
 
-The Cloudflare Function sends mail through Gmail's API; `GMAIL_APP_PASSWORD` alone is not sufficient on Cloudflare Workers. Redeploy after setting or changing variables. Use the same Gmail account for `GMAIL_USER` and the OAuth authorization.
+The Cloudflare Worker sends mail through Gmail's API; `GMAIL_APP_PASSWORD` alone is not sufficient on Cloudflare Workers. Use the same Gmail account for `GMAIL_USER` and the OAuth authorization. Redeploy after setting or changing variables.
 
 The form shows a success message only after Gmail accepts the email. If email delivery is not configured or fails, it displays an error so the visitor can try again.
