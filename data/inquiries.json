@@ -9,5 +9,31 @@
     "description": "csAdvsfvzfvzvzdvsadfcdvcczxcxcc",
     "createdAt": "2026-11-22T14:35:12.627Z",
     "emailDispatched": false
+  },
+  {
+    "id": "WZ-7CF39F",
+    "fullName": "naman dhyani",
+    "email": "dhyaninamanit@gmail.com",
+    "company": "jaadu",
+    "service": "Website",
+    "budget": "2000 rs",
+    "description": "2edsfasdfsdfsdfsdfsdfsdfac",
+    "phone": "7668237697",
+    "phoneRegion": "+91",
+    "createdAt": "2026-11-25T09:10:40.084Z",
+    "emailDispatched": false
+  },
+  {
+    "id": "WZ-EBE6E3",
+    "fullName": "Webzy 3bro",
+    "email": "webzy3bro@gmail.com",
+    "company": "jaadu",
+    "service": "Website",
+    "budget": "2000 rs",
+    "description": "241234rserasdaszdcszdczxzxcz",
+    "phone": "7668237697",
+    "phoneRegion": "+91",
+    "createdAt": "2026-11-25T09:12:57.415Z",
+    "emailDispatched": false
   }
 ]
